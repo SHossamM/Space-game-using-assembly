@@ -1,0 +1,569 @@
+DRAW_E MACRO HI,WIDTH,COL,ROW,PLAYER
+
+    LOCAL XLOOP,YLOOP,CONTINUE,FINAL
+     ;/////CHECK WHICH PART OF THE ENEMY WILL BE DRAWN/////
+	 MOV DX,ROW
+     
+     MOV BX,0 
+     
+     MOV AX,CHECK1
+	 MOV TEMP,AX	
+     
+     MOV AX,DX
+
+     SUB TEMP,AX								;SUBTRACT FROM THE ROW NUMBER OF THE ENEMY THE STARTING VALUE OF DRAWING
+     JS CONTINUE								;IF THE ROW IS GREATER THAN THE SATRTING VALUE JMP TO DRAW THE HOLE ENEMY
+     MOV AX,TEMP								;ELSE GET THE NUBER OF HIDDEN ROW 
+     MOV CX,WIDTH	
+     MUL CL										;MULTIPLY IT BY THE WIDTH OF THE ENEMY
+     MOV BX,AX									;TO DETERMINE THE NUMBER OF BYTES NOT TO DRAW FROM THE ENEMY
+     ADD DX,TEMP								;TO DETERMINE THE ROW NUMBER TO START DRAWING ON THE SCREEN
+    
+     CONTINUE:
+     SUB DX,HI
+     MOV SI,OFFSET PLAYER
+     ADD SI,BX									;ADD THE NUMBER OF BYTES NOT TO DRAW FROM THE ENEMY TO THE ADDRESS OF THE START POINT OF THE ENEMY
+
+     ;/////DRAW THE ENEMY/////
+     MOV AH,0CH 
+     MOV BX,COL
+     ADD BX,WIDTH
+     XLOOP:
+		 MOV CX,COL
+		 YLOOP:
+			 MOV AL,[SI]						;IF ICON PIXEL IS 0 PIXEL WILL BE BLACK,IF PIXEL IS 255 PIXEL WILL HAVE SET COLOR
+			 INT 10H
+			 INC SI								;MOVE TO NEXT PIXEL OF THE DRAWING
+			 INC CX								;MOVE TO NEXT COLUMN OF SCREEN
+			 CMP CX,BX							;CHECK IF THE WIDTH OF DRAWING WAS REACHED TO MOVE TO NEXT ROW
+		 JNZ YLOOP
+		 INC DX
+		 CMP DX,FINALLINE						;IF THE NEXT LINE TO DRAW IS EXCEEDING THE PLAYING SCREEN 
+		 JA FINAL								;STOP DRAWING
+		 CMP DX,ROW
+     JNZ XLOOP
+	 FINAL:
+   
+ENDM DRAW_E
+;///////////////////////////////////////////////
+DRAW MACRO HI,WIDTH,COL,ROW,COLOR,PLAYER 
+    LOCAL XL,YL 
+     MOV DX,ROW
+     SUB DX,HI
+     MOV SI,OFFSET PLAYER
+     MOV AH,0CH 
+     MOV BX,COL
+     ADD BX,WIDTH
+     XL:
+     MOV CX,COL
+     YL:
+     MOV AL,COLOR
+	 AND AL,[SI]
+     INT 10H
+     INC SI
+     INC CX
+     CMP CX,BX
+     JNZ YL
+     INC DX
+     CMP DX,ROW
+     JNZ XL
+    
+ENDM DRAW 
+;////////////////////////////////////////////////
+PRINT_SCORE MACRO S1,S2
+ 
+    MOV BH,0 
+   ;/////print score of player1/////
+   SETCURSOR 1,0
+   WRITE_2_DIG S1 
+   SETCURSOR 1,18
+   ;/////print score of player2/////
+   WRITE_2_DIG S2 
+    
+  
+ENDM PRINTSCORE   
+;////////////////////////////////////////////////
+PRINT_SCREEN MACRO
+ LOCAL LINE
+   ;/////move cursor below score///// 
+   SETCURSOR 2,0
+   ;/////to isolate score///// 
+   DISPLAY_CHARS '-',0FH,40
+   ;/////move cursor above chat///// 
+   SETCURSOR 20,0
+   ;/////to isolate score/////
+  DISPLAY_CHARS '-',0FH,40
+  ;/////////////////////
+  MOV CX,0 ;COLUMN
+	MOV DX,190 ;ROW
+	MOV AL,0FH ;PIXEL COLOR
+	MOV AH,0CH ;DRAW PIXEL COMMAND
+	
+	LINE: INT 10H
+	INC CX
+	CMP CX,320
+	JNZ LINE
+  SETCURSOR 24,0
+  DISPLAYSTRING MES8  
+ ENDM PRINTSCREEN
+;////////////////////////////////////////////
+SHIFT_PLAYER_LEFT MACRO HI,COL,ROW
+  LOCAL SHLLOOP
+	  MOV AL,0									;BLACK PIXEL TO ERASE
+	  MOV AH,0CH
+	  MOV CX,COL
+	  ADD CX,WIDTH								;SET COLUMN TO BE ERASED TO THE COLUMN AFTER THE PLAYER'S ENDING COLUMN 
+	  MOV DX,ROW
+	  SHLLOOP:
+	   INT 10H
+	   DEC DX
+	   MOV SI,ROW
+	   SUB SI,DX
+	   CMP SI,HI
+	   JNE SHLLOOP
+ ENDM SHIFT_PLAYER_LEFT
+ ;////////////////////////////////////////// 
+ SHIFT_PLAYER_RIGHT MACRO HI,COL,ROW
+	 LOCAL SHRLOOP
+	  MOV AL,0									;PIXEL IS BLACK TO CLEAR
+	  MOV AH,0CH								;PIXEL DRAW COMAND
+	  MOV CX,COL
+	  DEC CX									;SET COLUMN TO THE COLUMN BEFORE MOVING RIGHT(COL-1)
+	  MOV DX,ROW								;START DARWING PIXELS FROM START ROW OF PLAYER
+	  SHRLOOP:
+	   INT 10H
+	   DEC DX
+	   MOV SI,ROW
+	   SUB SI,DX
+	   CMP SI,HI								;DRAW BLACK PIXELS TILL YOU REACH THE PLAYER HEIGHT
+	   JNE SHRLOOP
+ ENDM SHIFT_PLAYER_RIGHT
+ ;////////////////////////////////////////// 
+     
+ FIRE MACRO  COLOUR,COLUMN,WIDTH2,R,HI
+    LOCAL D
+  MOV AH,0CH									;Draw command
+  MOV AL,COLOUR
+  MOV CX,COLUMN									; C1+W/2
+  ADD CX,WIDTH2
+  MOV DX,R										;START-4-HI
+  SUB DX,4
+  SUB DX,HI 
+  MOV BX,DX
+  SUB BX,5
+  D:
+	 INT 10H 
+	 DEC DX 
+	 CMP DX,BX									;HI
+ JNZ D 
+ ENDM FIRE
+ ;/////////////////////////////
+ MOVE_FIRE1 MACRO  WIDTH2,R,HI,COL
+ LOCAL F,OUTSIDE
+ MOV DI,R
+ F:
+    FIRE  0EH,COL,WIDTH2,DI,HI					;Draw yellow fire
+    DELAY										;Delay inorder to give player time to see fire before it is cleared
+    DELAY
+    DELAY
+
+  FIRE 00H,COL,WIDTH2,DI,HI						;Clear yellow fire by black one (Delete fire)
+  SUB DI,20
+  CMP DI,30
+  JLE OUTSIDE
+  MOV BX,FIRESTOP								;Check where the fire should stop
+  CMP DI,BX
+  JG F
+  OUTSIDE:
+ENDM MOVE_FIRE1
+;////////////////////////////////////////// 
+DISP_WINNER MACRO S1,S2,STR1,STR2,WINSTR,DRAWS
+	  LOCAL P2,NOWIN
+	  CLEAR_SCREEN
+	  SETCURSOR 12,5
+	  DISPLAYSTRING STR1						;WRITE PLAYER1'S SCORE
+	  SETCURSOR 14,5
+	  WRITE_2_DIG S1
+
+	  SETCURSOR 12,25
+	  DISPLAYSTRING STR2						;WRITE PLAYER2'S SCORE
+	  SETCURSOR 14,25
+	  WRITE_2_DIG S2
+	  SETCURSOR 18,13
+	  MOV AL,S1
+	  CMP AL,S2
+	  JE NOWIN
+	  MOV AL,S1
+	  CMP AL,S2									;SEE WHICH PLAYER HAS HIGHER SCORE
+	  JL P2
+	  ;PLAYER 1 WINS
+	  DISPLAYSTRING STR1
+	  DISPLAYSTRING WINSTR 
+	  DELAY_SECS 5								;LEAVE SCORE ON SCREEN FRO 5 SECS
+	  JMP ENDPROC								;RETURN TO MAINSCREEN
+	  
+	  P2:										;PLAYER 2 WINS
+	  DISPLAYSTRING STR2
+	  DISPLAYSTRING WINSTR 
+	  DELAY_SECS 5
+	  JMP ENDPROC
+	  NOWIN:
+	  DISPLAYSTRING DRAWS
+	  DELAY_SECS 5
+	  
+
+ENDM DISP_WINNER
+;//////////////////////////////////////
+
+KILL_ENEMY MACRO  XCO,S
+    LOCAL ENEMY_CHECK,EXIT2,NEXT2
+MOV SI,0
+MOV CX,ENEMYARRAYSIZE 
+MOV FIRESTOP,30
+ENEMY_CHECK:
+    MOV AX,XCO 
+    
+    ADD AX,WIDTH2
+    SUB AX,ENEMYARRAYY[SI]						;Subtract from rightmost x of player the left most x of enemy to check if both are in same range of values
+    CMP AX,16									;Check if enemy's X coordinate is in range of player's width which is 16
+    JA  NEXT2
+    CMP AX,0
+    JB  NEXT2 
+    ;/////THEN THIS IS THE ENEMY/////
+    CMP ENEMYARRAYX[SI],REMOVED 
+    JE NEXT2
+	MOV DI,ENEMYARRAYX[SI]
+    MOV FIRESTOP,DI									;Return  bottom y position of enemy to firestop to know where to stop fire
+    MOV  ENEMYARRAYX[SI],REMOVED				;ENEMY KILLED
+	OR STAT,1000B 
+    INC S
+    JMP EXIT2
+    
+    NEXT2:
+    ADD SI,2										;2 INC SINCE IT'S DW
+    LOOP ENEMY_CHECK
+    ;/////NO ENEMY SATISFIES THE CONDITION/////
+     EXIT2:   
+     
+ENDM  KILL_ENEMY
+;///////////////////////////////////////////////////////////
+ENEMY_TOUCH_PLAYER MACRO 
+    LOCAL MYLOOP,CONT,CHXRL,CHXT,CHRLM,EXIT,ENDGAME,P1,XR2,XM2
+    MOV CX,ENEMYARRAYSIZE
+    
+    MOV SI,0
+    MYLOOP:
+    MOV BX,ENEMYARRAYX[SI]
+    CMP BX,REMOVED								;Check if enemy already dead so wont touch player
+    JE  CONT
+	CMP BX,0									;Check if enemy has not yet arrived since array sorted so exit 
+	JL  EXIT
+    MOV AX,R
+    MOV DX,ENEMYARRAYY[SI]
+    SUB AX,BX
+    CMP AX,8									;Check if enemy is in the bottom range of player
+    JLE CHXRL
+	CMP AX,12									;If enemy is far above the player continue
+    JA CONT
+    JMP CHXT
+    CMP BX,148									; if enemy on top or got deeper in the player so go and check its x range with player
+    JGE CHXT
+	JMP CONT
+    
+    CHXRL:										;Check x range from right and left for player 1
+    MOV AX,C1
+    ADD AX,WIDTH
+    SUB AX,DX
+    CMP AX,0
+    JL XR2
+	CMP AX,32
+	JG XR2
+	MOV AX,C1
+    JMP ENDGAME
+    XR2:										;Check x range from right and left for player 2
+	MOV AX,C2
+    ADD AX,WIDTH
+    SUB AX,DX
+	CMP AX,0
+    JL CONT
+	CMP AX,32
+	JG CONT
+	MOV AX,C2
+    JMP ENDGAME
+
+    ;//////////////////////
+    CHXT:									    ;Check x range if on top for player 1
+	MOV AX,C1
+    ADD AX,WIDTH
+    SUB AX,DX
+    CMP AX,26
+    JA XM2
+	CMP AX,6
+	JB XM2
+	MOV AX,C1
+    JMP ENDGAME
+XM2:											;Check x range if on top for player 2
+	MOV AX,C2
+    ADD AX,WIDTH
+    SUB AX,DX
+    CMP AX,26
+    JA CONT
+	CMP AX,6
+	JB CONT
+	MOV AX,C2
+    
+    ;///////////////////////////
+    ENDGAME:
+    
+    ;/////HERE ENEMY TOUCHED PLAYER SO END GAME/////
+   
+    CMP AX,C1									;------->CHECK WHICH PLAYER DIED
+    JNE P1    
+    											;PLAYER 2 WINS
+          SETCURSOR 18,13
+    	  DISPLAYSTRING STR2
+    	  DISPLAYSTRING WINSTR 
+    	  DELAY_SECS 5
+    	 JMP ENDPROC
+    	  
+    P1:											;PLAYER 1 WINS
+	      SETCURSOR 18,13
+    	  DISPLAYSTRING STR1
+    	  DISPLAYSTRING WINSTR 
+    	  DELAY_SECS 5							;LEAVE SCORE ON SCREEN FRO 5 SECS
+    	  JMP ENDPROC							;MOVE TO THE RETURN PART OF THE FUNCTION AFTER WHICH WE RETUN BACK TO THE MAINSCREEN
+    
+    CONT:
+    ADD SI,2
+    LOOP MYLOOP
+    
+    EXIT:
+    
+
+ENDM ENEMY_TOUCH_PLAYER
+;//////////////////////////////////
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+CHECKP1     MACRO
+      LOCAL OTHERP1,TRANSLATE1,SENDMOVMENT1,SETR1,SETL1,SETF1,F4PRESSED1,MOVPLAYERA,FINISH1
+      MOV AH,1
+      INT 16H 
+      JZ OTHERP1
+
+	  MOV AH,0
+	  INT 16H
+	  CMP AL,0
+	  JE TRANSLATE1
+      MOV TEMP2,Al
+      SEND_BYTE TEMP2
+	  WRITE_CHAR CURSOR3,MY_USERNAME,1500H,E1
+	  JMP OTHERP1
+	  
+      TRANSLATE1:
+      
+      CMP AH,3EH;IF F4 IS PRESSED
+      JE F4PRESSED1
+      CMP AH,4BH
+      JE SETL1
+      
+      CMP AH,48H
+      JE SETF1
+      
+      CMP AH,4DH
+      JNE OTHERP1
+      
+      SETR1:
+      MOV AH,RIGHTARROW
+      JMP SENDMOVMENT1
+      
+      SETL1:
+      MOV AH,LEFTARROW
+      JMP SENDMOVMENT1
+      
+      SETF1: 
+      MOV AH,FIREKEY
+      JMP SENDMOVMENT1
+      
+      F4PRESSED1:
+      MOV TEMP2,AH
+      SEND_BYTE TEMP2
+      JMP DISP_SCORE
+         
+      SENDMOVMENT1:
+      
+      MOV TEMP2,AH
+      SEND_BYTE TEMP2
+      MOV AH,TEMP2
+      CALL MOVE_P1
+      
+
+      
+      OTHERP1:
+      RECIEVE_BYTE
+      MOV AH,AL
+      CMP AL,0
+      JE RE 
+     CMP AL,3EH;IF F4 IS PRESSED
+      JE  DISP_SCORE
+	   CMP AL,3
+      JLE MOVPLAYERA
+        
+	  MOV TEMP2,AL
+	  WRITE_CHAR CURSOR4,OTHER_USER,1600H,E2
+	  JMP FINISH1
+    MOVPLAYERA:
+      MOV AL,AH
+      CALL MOVE_P2
+      
+      FINISH1: 
+      
+CHECKP1   ENDM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CHECKP2     MACRO
+      LOCAL OTHERP2,TRANSLATE2,SENDMOVMENT2,SETR2,SETL2,SETF2,F4PRESSED2,MOVPLAYERB,FINISH2
+      MOV AH,1
+      INT 16H 
+      JZ OTHERP2
+	  MOV AH,0
+	  INT 16H
+	  CMP AL,0
+	  JE TRANSLATE2
+      MOV TEMP2,AL
+      SEND_BYTE TEMP2
+      
+	  WRITE_CHAR CURSOR3,MY_USERNAME,1500H,E1
+	  JMP OTHERP2
+	   TRANSLATE2:
+
+      CMP AH,3EH;IF F4 IS PRESSED
+      JE F4PRESSED2  
+      
+      CMP AH,4BH
+      JE SETL2
+      
+      CMP AH,48H
+      JE SETF2
+      
+      CMP AH,4DH
+      JNE OTHERP2
+      
+      SETR2:
+      MOV AH,RIGHTARROW
+      JMP SENDMOVMENT2
+      
+      SETL2:
+      MOV AH,LEFTARROW
+      JMP SENDMOVMENT2
+      
+      SETF2: 
+      MOV AH,FIREKEY
+      JMP SENDMOVMENT2
+      
+      F4PRESSED2:
+      MOV TEMP2,AH
+      SEND_BYTE TEMP2
+      JMP DISP_SCORE
+         
+      SENDMOVMENT2:
+      
+      MOV TEMP2,AH
+      SEND_BYTE TEMP2
+      MOV AH,TEMP2
+      CALL MOVE_P2
+      
+      
+      
+      OTHERP2:
+      RECIEVE_BYTE
+      MOV AH,AL
+      CMP AL,0
+      JE RE 
+      
+     CMP AL,3EH;IF F4 IS PRESSED
+     JE  DISP_SCORE 
+     CMP AL,3 
+     JLE MOVPLAYERB
+	 MOV TEMP2,AL
+	 WRITE_CHAR CURSOR4,OTHER_USER,1600H,E2
+	 JMP FINISH2
+      MOVPLAYERB: 
+      CALL MOVE_P1
+      
+      FINISH2:
+     
+CHECKP2   ENDM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+PUTCURSOR MACRO POS 
+MOV AH,2
+MOV DX,POS
+INT 10H
+ENDM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+GET_POS  MACRO
+MOV AH,3H
+MOV BH,0H
+INT 10H
+ENDM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+WRITE_CHAR MACRO CURSOR,NAME,POS,S
+LOCAL ADD_NAME,FINISHEDM,BACKSPACE,FINSHO1,LALA
+;CHECK IF CHAR IS ENTER AND BACSPACE
+
+CMP AL,8
+JE BACKSPACE
+
+CMP AL,13
+JE ADD_NAME  ;EQUAL TO END OF LINE AND FIRST START
+;NEITHER ENTER NOR BACKSPACE SO IT IS A CHARACTER
+CMP AL,32
+JL FINSHO1
+MOV AX,CURSOR
+CMP AX,POS  ;CHECK IF IT IS FIRST TIME FOR INLINE CHATTING
+JE ADD_NAME
+MOV AX,POS  ;CHECK IF REACHED END OF LINE
+ADD AX,40
+CMP CURSOR,AX
+jGE ADD_NAME
+JMP FINISHEDM
+
+BACKSPACE:
+SUB CURSOR,1
+MOV AX,S
+CMP AX,CURSOR
+JL LALA
+INC AX
+MOV CURSOR,AX
+JMP FINSHO1
+LALA:PUTCURSOR CURSOR
+DISPLAY_CHARS 'E',00H,1 ;THIS COMAND DOES NOT MOVE THE CURSOR
+JMP FINSHO1
+
+ADD_NAME:
+PUTCURSOR POS  ;SETTING CURSOR AT P1/P2 POSITION
+DISPLAY_CHARS 'E',00H,40
+PUTCURSOR POS 
+DISPLAYSTRING NAME
+GET_POS 
+MOV CURSOR,DX
+DISPLAY_CHARS ':',0FH,1  ;1 CHARACTER NOT DISPLAYED 2 CHARACTER IS DISPLAYED BUT NOT IN CORRECT POSITION
+MOV AX,CURSOR
+MOV S,AX
+INC CURSOR
+CMP TEMP2,13
+JE FINSHO1
+FINISHEDM:
+PUTCURSOR CURSOR
+
+DISPLAY_CHARS TEMP2,0FH,1
+INC CURSOR
+
+FINSHO1:
+ENDM
+
+
+
+
+
+

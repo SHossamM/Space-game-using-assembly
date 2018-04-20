@@ -1,0 +1,164 @@
+;//////////////////Phase1/////////////////
+;By: Amira Ahmed 1142324
+;    Sahar Hossam 1142335
+;    Salma Hanafy 1142046
+;For this phase player 1 moves with right and left arrows and fires with space
+;               player 2 moves to right with 'a' and left with'd' and fires with 'w'
+;//////////////////////////////////////////
+INCLUDE INIT.INC
+INCLUDE LOGIC.INC
+INCLUDE MAINFN.INC
+
+.MODEL LARGE
+.STACK 64
+.DATA
+PLAYER    LABEL BYTE
+db   000,000,000,000,255,255,255,255,255,255,255,255,000,000,000,000
+db   000,000,000,000,255,255,255,255,255,255,255,255,000,000,000,000
+db   000,000,000,000,255,255,255,255,255,255,255,255,000,000,000,000
+db   000,000,000,000,255,255,255,255,255,255,255,255,000,000,000,000
+db   255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255
+db   255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255
+db   255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255
+db   255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255
+db   255,255,255,255,000,000,000,000,000,000,000,000,255,255,255,255
+db   255,255,255,255,000,000,000,000,000,000,000,000,255,255,255,255
+db   255,255,255,255,000,000,000,000,000,000,000,000,255,255,255,255
+db   255,255,255,255,000,000,000,000,000,000,000,000,255,255,255,255
+C1               DW  0
+C2               DW  300
+R                DW  161
+SPLAYER          DB  'Player$'
+WINSTR           DB  ' WINS!$' 
+DRAWS            DB  'DRAW$'
+S1               DB  0
+S2               DB  0 
+WIDTH            DW  16
+WIDTH2           DW  8    ;Half the width easier than using div instruction each time
+HI               DW  12
+
+ICONWIDTH        DW  16
+STARCOLOUR       DB  2  
+E1               DW  1500H
+E2               DW  1600H  
+STARX            DW  144
+STARY            DW  84
+   
+COUNT            DB  0 
+RIGHTARROW       EQU 1
+LEFTARROW        EQU 2
+FIREKEY          EQU 3 
+REMOVED          EQU 200 
+TEMP             DW  ?
+TEMP2           DB   ?
+TEMP1           DB   ?
+TEMP3           DB   ?
+ENEARRSIZELEV   DW  21,27
+ENESPEEDLEV     DB  2,1 
+ENESTEPLEV      DB  5,10 
+
+
+ENEARRX          DW 58,58 ,44 ,44,36,36,035,035,035,035,015,015,015,015,-15,-15,-15,-15,-15,-15,-15,-15,-35,-35,-35,-35,-35,-61,-61,-67
+ENEMYARRAYY      DW 10,111,82 ,00,40,180,300,150,200,280,23,110,295,040,015,060,130,150,200,250,280,300,130,160,040,015,060,54 ,129,256
+
+ENEMYARRAYX      DW  30 DUP('$') 
+ENEMYARRAYSIZE   DW  ?
+ENEMYSPEED       DB  ?
+ENEMYSTEP        DB  ?
+NEXTTIME         DB  ?
+FIRESTOP         DW  30  ;Used to find where the fire will stop inorder not to b drawn above the enemy
+CHECK1           DW  39
+FINALLINE        DW  160 
+
+ENEMY    LABEL BYTE
+db   15,00,00,00,00,00,00,00,00,00,00,00,00,00,00,15
+db   00,05,00,00,00,00,00,00,00,00,00,00,00,00,05,00
+db   00,00,05,00,00,00,00,00,00,00,00,00,00,05,00,00
+db   00,00,00,05,00,00,00,00,00,00,00,00,05,00,00,00
+db   00,00,00,00,05,05,05,05,05,05,05,05,00,00,00,00
+db   00,00,00,05,05,05,05,05,05,05,05,05,05,00,00,00
+db   00,00,05,05,05,05,05,05,05,05,05,05,05,05,00,00
+db   00,05,05,05,05,04,04,05,05,04,04,05,05,05,05,00
+db   00,05,05,05,05,04,04,05,05,04,04,05,05,05,05,00
+db   00,05,05,05,05,05,05,05,05,05,05,05,05,05,05,00
+db   00,00,05,05,05,05,05,05,05,05,05,05,05,05,00,00
+db   00,00,00,05,05,05,05,05,05,05,05,05,05,00,00,00
+db   00,00,05,05,05,05,05,05,05,05,05,05,05,05,00,00
+db   00,00,05,05,00,00,00,00,00,00,00,00,05,05,00,00
+db   05,05,05,05,00,00,00,00,00,00,00,00,05,05,05,05
+db   05,05,05,05,00,00,00,00,00,00,00,00,05,05,05,05
+
+MES1  DB   '*To start chatting press F1$'
+MES2  DB   '*To start Invaders game press F2$'
+MES3  DB   '*To end the program press ESC$'
+MES4  DB  'Please enter your name:$'
+MES5  DB  'Press Enter key to continue$'
+MES6  DB  '-Press ESC to end chat with $'
+MES7  DB  'Choose a level (1,2) : $'
+MES8  DB  '-Press F4 to end the game$'
+MES9  DB  '-Press F1 to accept chat request from $'
+MES10 DB  '-Press F2 to accept game request from $'
+MES11 DB  '-You sent a game request to $'
+MES12 DB  '-You sent a chat request to $'
+
+STR1  DB  16 DUP('$')
+MY_USERNAME DB  16 DUP('$')  
+STR2  DB  16 DUP('$')
+OTHER_USER  DB  16 DUP('$') 
+
+
+STAT       DB  10B ;BIT0:FIRE1,BIT1:PLAYER1,BIT2:FIRE2 ,BIT3:ENEMY CHANGE
+
+
+CURSOR4    DW  1600H 
+CURSOR3    DW  1500H
+CURSOR1    DW  0
+CURSOR2    DW  0C00H 
+
+CURSORINL1 DW  2100H
+CURSORINL2 DW  2200H 
+CHAR       DB  ?
+.CODE
+MAIN PROC FAR  
+      MOV AX,@DATA
+      MOV DS,AX  
+      MOV ES,AX
+      
+      INITIALIZE_UART
+      
+      MOV AH, 0
+      MOV AL, 13H
+      INT 10H  ;GRAPHICS MODE
+  ;------------------------
+     GET_USERNAME MY_USERNAME,MES4,MES5  
+       
+     MAINSCREEN:
+     
+     MAIN_SCREEN
+   
+     
+     F2:      ; GAME MODE  
+     
+    CALL GAME_MODE
+    JMP MAINSCREEN
+    
+
+     F1:       ;CHATTING 
+      CLEAR_SCREEN
+      CALL CHAT_MODE
+      JMP MAINSCREEN
+     
+   
+  ESC: 
+      CLEAR_SCREEN
+      MOV AH,4CH
+      INT 21H 
+      HLT  
+    
+    
+    
+MAIN ENDP
+;///////////////////////////////////////////////////
+INCLUDE  FNS.ASM 
+
+END MAIN
